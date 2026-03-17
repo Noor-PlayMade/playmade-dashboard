@@ -578,7 +578,7 @@
     <div class="topbar-right">
       <div class="day-tabs" id="dayTabs"></div>
       <input type="date" id="customDate" title="Pick a custom date" />
-      <button class="refresh-btn" id="refreshBtn" onclick="loadData()">
+      <button class="refresh-btn" id="refreshBtn" onclick="loadData(true)">
         <span id="rIcon">&#x21bb;</span> Refresh
       </button>
     </div>
@@ -675,26 +675,64 @@ function showSkeleton() {
   `;
 }
 
+/* ── Cache ───────────────────────────────────────── */
+const CACHE_KEY = 'pm_dash_';
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24h in ms
+
+function getCached(date) {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY + date);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL) {
+      localStorage.removeItem(CACHE_KEY + date);
+      return null;
+    }
+    return data;
+  } catch(e) { return null; }
+}
+
+function setCache(date, data) {
+  try {
+    localStorage.setItem(CACHE_KEY + date, JSON.stringify({ data, ts: Date.now() }));
+    // Prune old entries — keep max 14 days
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(CACHE_KEY)) {
+        try {
+          const { ts } = JSON.parse(localStorage.getItem(k));
+          if (Date.now() - ts > CACHE_TTL * 14) localStorage.removeItem(k);
+        } catch(e) { localStorage.removeItem(k); }
+      }
+    }
+  } catch(e) { /* storage full or unavailable */ }
+}
+
 /* ── Load ───────────────────────────────────────── */
-async function loadData() {
+async function loadData(forceRefresh) {
   if (isLoading) return;
-  isLoading = true;
 
   const btn = document.getElementById('refreshBtn');
   const icon = document.getElementById('rIcon');
   const err = document.getElementById('errorBanner');
+  err.classList.remove('show');
 
+  // Serve from cache instantly if available
+  if (!forceRefresh) {
+    const cached = getCached(selectedDate);
+    if (cached) {
+      render(cached);
+      return;
+    }
+  }
+
+  isLoading = true;
   btn.disabled = true;
   icon.className = 'spin';
-  err.classList.remove('show');
   showSkeleton();
 
   try {
-    const res = await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date: selectedDate })
-    });
+    const res = await fetch('/api/data?date=' + encodeURIComponent(selectedDate));
 
     if (!res.ok) {
       let msg = 'Server error ' + res.status;
@@ -703,6 +741,7 @@ async function loadData() {
     }
 
     const data = await res.json();
+    setCache(selectedDate, data);
     render(data);
   } catch(e) {
     document.getElementById('errMsg').textContent = e.message;

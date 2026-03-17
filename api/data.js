@@ -1,13 +1,15 @@
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { date } = req.body;
-  if (!date) return res.status(400).json({ error: 'Missing date parameter' });
+  // Accept both GET (?date=...) and POST ({ date: ... })
+  const date = req.method === 'GET' ? req.query.date : req.body?.date;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: 'Missing or invalid date parameter (YYYY-MM-DD)' });
+  }
 
   const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
   const INTERCOM_TOKEN = process.env.INTERCOM_ACCESS_TOKEN;
@@ -37,11 +39,6 @@ export default async function handler(req, res) {
       return r.json();
     }
 
-    // Fetch open tickets
-    const openData = await fetchIntercom(
-      'https://api.intercom.io/conversations?state=open&per_page=150'
-    );
-
     // Fetch closed tickets (up to 3 pages to cover the date range)
     let closedConvos = [];
     let cursor = null;
@@ -55,15 +52,15 @@ export default async function handler(req, res) {
       if (!cursor) break;
     }
 
-    // Filter yesterday's tickets
-    const allConvos = [...(openData.conversations || []), ...closedConvos];
-    const yesterdayConvos = allConvos.filter(c => {
+    // Filter target day's tickets
+    const yesterdayConvos = closedConvos.filter(c => {
       const ca = c.created_at || 0;
       return ca >= dayStart && ca <= dayEnd;
     });
 
-    // Handle no data — return valid empty structure instead of erroring
-    if (yesterdayConvos.length === 0 && (openData.conversations || []).length === 0) {
+    // Handle no data — return valid empty structure
+    if (yesterdayConvos.length === 0) {
+      res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=3600');
       return res.status(200).json({
         date,
         yesterday: {
@@ -71,7 +68,6 @@ export default async function handler(req, res) {
           ticket_types: [], ratings: { '1':0,'2':0,'3':0,'4':0,'5':0 },
           bad_reason_categories: [], user_quotes: [], sports_breakdown: []
         },
-        open_tickets: [],
         trend_7days: []
       });
     }
@@ -102,7 +98,7 @@ export default async function handler(req, res) {
       d.setUTCDate(d.getUTCDate() - i);
       const ds = Math.floor(new Date(d.toISOString().split('T')[0] + 'T00:00:00Z').getTime() / 1000);
       const de = ds + 86399;
-      const dayConvos = allConvos.filter(c => c.created_at >= ds && c.created_at <= de);
+      const dayConvos = closedConvos.filter(c => c.created_at >= ds && c.created_at <= de);
       const aiCount = dayConvos.filter(c => c.ai_agent_participated).length;
       const label = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
       trend.push({
@@ -113,31 +109,6 @@ export default async function handler(req, res) {
         human: dayConvos.length - aiCount
       });
     }
-
-    // Open tickets formatted
-    const openTickets = (openData.conversations || []).map(c => {
-      const tca = c.ticket?.custom_attributes || {};
-      const rating = tca.Rating?.value ?? tca.Rating ?? null;
-      const title = tca._default_title_?.value || tca._default_title_ || 'Ticket';
-      const desc = tca._default_description_?.value || '';
-      const fbMatch = desc.match(/Feedback:\s*(.+)/);
-      const issue = fbMatch ? fbMatch[1].trim() : title;
-      const loc = tca['Location Name']?.value || tca.Location?.value || tca.Location || '';
-      const user = (tca['User First Name']?.value || '') + ' ' + (tca['User Last Name']?.value || tca.Name?.value || '');
-      const ts = c.created_at ? new Date(c.created_at * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
-      const type = c.ticket?.ticket_type?.toLowerCase().includes('non') ? 'non_return' : rating <= 2 ? 'bad_rating' : 'other';
-      return {
-        id: c.id,
-        title,
-        user: user.trim() || 'Unknown',
-        issue: issue || title,
-        location: loc,
-        time: ts,
-        rating,
-        type,
-        url: `https://app.intercom.com/a/apps/uf97uhs1/conversations/${c.id}`
-      };
-    });
 
     // ── 3. Ask Claude to categorise the bad rating feedback ───────────────
     const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -192,6 +163,9 @@ Rules:
     rawSummary.forEach(c => { typeCount[c.type] = (typeCount[c.type]||0)+1; });
     const ticket_types = Object.entries(typeCount).sort((a,b)=>b[1]-a[1]).map(([name,count])=>({name,count}));
 
+    // Cache for 24h on Vercel CDN — historical data won't change
+    res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=3600');
+
     res.status(200).json({
       date,
       yesterday: {
@@ -205,7 +179,6 @@ Rules:
         user_quotes: analysis.user_quotes || [],
         sports_breakdown: analysis.sports_breakdown || []
       },
-      open_tickets: openTickets,
       trend_7days: trend
     });
 
