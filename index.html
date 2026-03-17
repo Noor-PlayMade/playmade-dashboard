@@ -7,7 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
     --orange: #F24A00;
@@ -38,7 +38,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    font-family: 'DM Sans', -apple-system, sans-serif;
+    font-family: 'Outfit', -apple-system, sans-serif;
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
@@ -64,20 +64,22 @@
 
   .logo { display: flex; align-items: center; gap: 12px; }
 
-  .logo-mark {
-    width: 38px; height: 38px;
-    background: var(--orange);
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'DM Mono', monospace;
-    font-size: 12px; font-weight: 500; color: #fff;
-    letter-spacing: -0.5px;
+  .logo-img {
+    height: 36px;
+    width: auto;
+  }
+
+  .logo-divider {
+    width: 1px;
+    height: 28px;
+    background: var(--border2);
+    margin: 0 4px;
   }
 
   .logo-name {
-    font-size: 18px; font-weight: 700;
+    font-size: 16px; font-weight: 600;
     color: var(--burgundy);
-    letter-spacing: -0.4px;
+    letter-spacing: -0.3px;
   }
 
   .logo-sub {
@@ -139,7 +141,7 @@
     border-radius: 8px;
     font-size: 13px;
     font-weight: 600;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Outfit', sans-serif;
     cursor: pointer;
     display: flex; align-items: center; gap: 7px;
     transition: opacity .15s, transform .1s;
@@ -248,7 +250,7 @@
     color: var(--red);
     font-size: 12px;
     font-weight: 600;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Outfit', sans-serif;
     padding: 6px 16px;
     border-radius: 6px;
     cursor: pointer;
@@ -569,10 +571,11 @@
 <div class="shell">
   <div class="topbar">
     <div class="logo">
-      <div class="logo-mark">PM</div>
+      <img src="/logo.png" alt="Playmade" class="logo-img" />
+      <div class="logo-divider"></div>
       <div>
         <div class="logo-name">Support Dashboard</div>
-        <div class="logo-sub">Playmade &middot; Intercom &middot; Daily review</div>
+        <div class="logo-sub">Intercom &middot; Daily review</div>
       </div>
     </div>
     <div class="topbar-right">
