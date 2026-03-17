@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Playmade · Support Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0a0d14; --surface:#111520; --surface2:#161d2e;
+    --border:#1e2840; --border2:#253050;
+    --text:#e2e8f0; --muted:#4a5680; --muted2:#6b7aa0;
+    --blue:#4f8ef7; --blue-dim:#1a2d5a;
+    --green:#3dd68c; --green-dim:#0d3320;
+    --red:#f75f5f; --red-dim:#3d1515;
+    --amber:#f7b84f; --amber-dim:#3d2c0d;
+    --r:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:28px 32px;font-size:14px;}
+
+  /* TOPBAR */
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:14px;}
+  .logo{display:flex;align-items:center;gap:10px;}
+  .logo-mark{width:34px;height:34px;background:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:#fff;letter-spacing:-0.5px;}
+  .logo-name{font-size:16px;font-weight:600;color:var(--text);letter-spacing:-0.3px;}
+  .logo-sub{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:1px;}
+  .topbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+
+  /* DAY TABS */
+  .day-tabs{display:flex;gap:5px;flex-wrap:wrap;}
+  .day-tab{padding:6px 12px;border-radius:99px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:11px;font-family:'DM Mono',monospace;cursor:pointer;transition:all .15s;white-space:nowrap;}
+  .day-tab:hover{border-color:var(--border2);color:var(--muted2);}
+  .day-tab.active{background:var(--blue-dim);border-color:var(--blue);color:var(--blue);}
+
+  input[type=date]{background:var(--surface);border:1px solid var(--border);color:var(--muted2);padding:7px 10px;border-radius:var(--r);font-size:12px;font-family:'DM Mono',monospace;cursor:pointer;outline:none;}
+  input[type=date]:focus{border-color:var(--blue);color:var(--text);}
+
+  .refresh-btn{background:var(--blue);border:none;color:#fff;padding:9px 18px;border-radius:var(--r);font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;gap:7px;transition:opacity .15s,transform .1s;white-space:nowrap;}
+  .refresh-btn:hover{opacity:.88;}
+  .refresh-btn:active{transform:scale(.97);}
+  .refresh-btn:disabled{opacity:.5;cursor:not-allowed;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .spin{display:inline-block;animation:spin .7s linear infinite;}
+
+  /* LOADING */
+  #loadingOverlay{display:none;position:fixed;inset:0;background:rgba(10,13,20,.88);z-index:100;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
+  #loadingOverlay.show{display:flex;}
+  .loader-ring{width:42px;height:42px;border:3px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;}
+  .loader-text{font-size:13px;color:var(--muted2);font-family:'DM Mono',monospace;}
+
+  /* ERROR */
+  #errorBanner{display:none;background:var(--red-dim);border:1px solid rgba(247,95,95,.4);border-left:3px solid var(--red);border-radius:var(--r);padding:12px 16px;font-size:13px;color:#ff9999;margin-bottom:18px;line-height:1.5;}
+  #errorBanner.show{display:block;}
+
+  /* SECTIONS */
+  .slabel{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-family:'DM Mono',monospace;margin:22px 0 10px;}
+
+  /* KPI */
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;position:relative;overflow:hidden;}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+  .kpi.blue::before{background:var(--blue);}
+  .kpi.green::before{background:var(--green);}
+  .kpi.amber::before{background:var(--amber);}
+  .kpi.red::before{background:var(--red);}
+  .kpi-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-family:'DM Mono',monospace;margin-bottom:10px;}
+  .kpi-val{font-size:32px;font-weight:600;line-height:1;letter-spacing:-1px;margin-bottom:5px;}
+  .kpi.blue .kpi-val{color:var(--blue);}
+  .kpi.green .kpi-val{color:var(--green);}
+  .kpi.amber .kpi-val{color:var(--amber);}
+  .kpi.red .kpi-val{color:var(--red);}
+  .kpi-sub{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
+
+  /* ALERT */
+  .alert{background:var(--red-dim);border:1px solid rgba(247,95,95,.25);border-left:3px solid var(--red);border-radius:var(--r);padding:12px 16px;}
+  .alert-head{font-size:13px;color:#ff9999;font-weight:500;display:flex;align-items:center;gap:8px;}
+  .alert-pill{font-size:10px;background:rgba(247,95,95,.2);color:var(--red);padding:2px 8px;border-radius:99px;font-weight:600;font-family:'DM Mono',monospace;}
+  .alert-body{font-size:12px;color:rgba(255,153,153,.65);margin-top:4px;font-family:'DM Mono',monospace;}
+
+  /* CARDS */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px 22px;}
+  .card-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px;}
+  .card-sub{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:14px;}
+
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+
+  /* BARS */
+  .blist{list-style:none;}
+  .brow{display:flex;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);}
+  .brow:last-child{border-bottom:none;}
+  .blbl{font-size:12px;color:var(--muted2);min-width:155px;}
+  .btrack{flex:1;margin:0 12px;background:var(--surface2);border-radius:3px;height:5px;overflow:hidden;}
+  .bfill{height:100%;border-radius:3px;}
+  .bval{font-size:12px;font-weight:500;color:var(--muted);min-width:22px;text-align:right;font-family:'DM Mono',monospace;}
+
+  /* STARS */
+  .srow{display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);}
+  .srow:last-child{border-bottom:none;}
+  .slbl2{font-size:12px;color:var(--muted2);min-width:28px;font-family:'DM Mono',monospace;}
+  .strack{flex:1;background:var(--surface2);border-radius:3px;height:6px;overflow:hidden;margin:0 10px;}
+  .sfill{height:100%;border-radius:3px;}
+  .snum{font-size:12px;font-weight:500;color:var(--muted);min-width:22px;text-align:right;font-family:'DM Mono',monospace;}
+
+  /* TICKETS */
+  .trow{display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);}
+  .trow:last-child{border-bottom:none;}
+  .tpill{font-size:10px;font-weight:600;padding:3px 9px;border-radius:99px;white-space:nowrap;margin-top:1px;flex-shrink:0;font-family:'DM Mono',monospace;}
+  .t-red{background:var(--red-dim);color:var(--red);border:1px solid rgba(247,95,95,.3);}
+  .t-amber{background:var(--amber-dim);color:var(--amber);border:1px solid rgba(247,184,79,.3);}
+  .t-blue{background:var(--blue-dim);color:var(--blue);border:1px solid rgba(79,142,247,.3);}
+  .ttitle{font-size:13px;font-weight:500;color:var(--text);}
+  .tmeta{font-size:11px;color:var(--muted);margin-top:3px;font-family:'DM Mono',monospace;}
+  .tlink{font-size:11px;color:var(--blue);text-decoration:none;margin-top:4px;display:inline-block;opacity:.8;}
+  .tlink:hover{opacity:1;text-decoration:underline;}
+
+  /* QUOTES */
+  .qrow{padding:9px 0;border-bottom:1px solid var(--border);}
+  .qrow:last-child{border-bottom:none;}
+  .qtext{font-size:13px;color:var(--muted2);font-style:italic;line-height:1.5;}
+  .qtext::before{content:'"';color:var(--muted);}
+  .qtext::after{content:'"';color:var(--muted);}
+  .qmeta{font-size:10px;color:var(--muted);margin-top:3px;font-family:'DM Mono',monospace;}
+
+  /* INSIGHT */
+  .insight{background:rgba(79,142,247,.07);border:1px solid rgba(79,142,247,.2);border-left:3px solid var(--blue);border-radius:var(--r);padding:10px 14px;font-size:12px;color:rgba(130,175,255,.9);line-height:1.6;margin-top:14px;font-family:'DM Mono',monospace;}
+
+  /* EMPTY */
+  .empty{text-align:center;padding:36px 20px;color:var(--muted);font-family:'DM Mono',monospace;font-size:13px;}
+
+  /* FOOTER */
+  .footer{text-align:center;font-size:11px;color:var(--muted);margin-top:24px;padding-top:16px;border-top:1px solid var(--border);font-family:'DM Mono',monospace;}
+
+  /* RESPONSIVE */
+  @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr);}.g3{grid-template-columns:1fr;}}
+  @media(max-width:600px){.g2{grid-template-columns:1fr;}body{padding:16px;}.kpi-grid{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+
+<div id="loadingOverlay">
+  <div class="loader-ring"></div>
+  <div class="loader-text" id="loadingText">Connecting to Intercom...</div>
+</div>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-mark">PM</div>
+    <div>
+      <div class="logo-name">Support Dashboard</div>
+      <div class="logo-sub">Playmade · Intercom · Daily review</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="day-tabs" id="dayTabs"></div>
+    <input type="date" id="customDate" title="Pick a custom date" />
+    <button class="refresh-btn" id="refreshBtn" onclick="loadData()">
+      <span id="rIcon">↻</span> Refresh
+    </button>
+  </div>
+</div>
+
+<div id="errorBanner"></div>
+<div id="dash"></div>
+
+<div class="footer">Playmade · Support Dashboard · Data live from Intercom</div>
+
+<script>
+let selectedDate = (() => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split('T')[0];
+})();
+let charts = {};
+
+function buildTabs() {
+  const container = document.getElementById('dayTabs');
+  container.innerHTML = '';
+  for (let i = 7; i >= 1; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const ds = d.toISOString().split('T')[0];
+    const btn = document.createElement('button');
+    btn.className = 'day-tab' + (ds === selectedDate ? ' active' : '');
+    btn.textContent = d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+    btn.onclick = () => { selectedDate = ds; document.getElementById('customDate').value = ds; buildTabs(); loadData(); };
+    container.appendChild(btn);
+  }
+  document.getElementById('customDate').value = selectedDate;
+}
+
+document.getElementById('customDate').addEventListener('change', e => {
+  selectedDate = e.target.value; buildTabs(); loadData();
+});
+
+buildTabs();
+
+async function loadData() {
+  const btn = document.getElementById('refreshBtn');
+  const icon = document.getElementById('rIcon');
+  const overlay = document.getElementById('loadingOverlay');
+  const err = document.getElementById('errorBanner');
+
+  btn.disabled = true;
+  icon.className = 'spin'; icon.textContent = '↻';
+  overlay.classList.add('show');
+  err.classList.remove('show');
+
+  const msgs = ['Connecting to Intercom...','Fetching tickets...','Analysing feedback...','Building charts...'];
+  let mi = 0;
+  const si = setInterval(() => {
+    document.getElementById('loadingText').textContent = msgs[Math.min(mi++, msgs.length-1)];
+  }, 1800);
+
+  try {
+    const res = await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: selectedDate })
+    });
+    if (!res.ok) {
+      const e = await res.json();
+      throw new Error(e.error || `Server error ${res.status}`);
+    }
+    const data = await res.json();
+    render(data);
+  } catch(e) {
+    err.textContent = '⚠ ' + e.message;
+    err.classList.add('show');
+  } finally {
+    clearInterval(si);
+    overlay.classList.remove('show');
+    btn.disabled = false;
+    icon.className = ''; icon.textContent = '↻';
+  }
+}
+
+function killCharts() {
+  Object.values(charts).forEach(c => { try{c.destroy();}catch(e){} });
+  charts = {};
+}
+
+function render(data) {
+  killCharts();
+  const y = data.yesterday;
+  const open = data.open_tickets || [];
+  const trend = data.trend_7days || [];
+  const displayDate = new Date(data.date + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  const total = (y.ai_resolved||0) + (y.human_resolved||0);
+  const pctAI = total > 0 ? Math.round(y.ai_resolved/total*100) : 0;
+  const totalRatings = Object.values(y.ratings||{}).reduce((a,b)=>a+b,0);
+  const star1pct = totalRatings > 0 ? Math.round((y.ratings['1']||0)/totalRatings*100) : 0;
+
+  document.getElementById('dash').innerHTML = `
+    ${open.length > 0 ? `
+      <div class="slabel">🚨 currently open</div>
+      <div class="alert" style="margin-bottom:4px;">
+        <div class="alert-head"><span class="alert-pill">${open.length} OPEN</span>Tickets requiring attention</div>
+        ${open[0] ? `<div class="alert-body">Latest: ${open[0].user} — "${open[0].issue}" · ${open[0].location}</div>` : ''}
+      </div>` : ''}
+
+    <div class="slabel">📅 ${displayDate}</div>
+    <div class="kpi-grid" style="margin-bottom:4px;">
+      <div class="kpi blue"><div class="kpi-lbl">Tickets raised</div><div class="kpi-val">${y.total}</div><div class="kpi-sub">all types</div></div>
+      <div class="kpi blue"><div class="kpi-lbl">AI resolved</div><div class="kpi-val">${y.ai_resolved}</div><div class="kpi-sub">${pctAI}% of day</div></div>
+      <div class="kpi green"><div class="kpi-lbl">Human resolved</div><div class="kpi-val">${y.human_resolved}</div><div class="kpi-sub">${100-pctAI}% of day</div></div>
+      <div class="kpi amber"><div class="kpi-lbl">Avg close time</div><div class="kpi-val">${(y.avg_close_min||0).toLocaleString()}</div><div class="kpi-sub">min / ticket</div></div>
+    </div>
+
+    <div class="slabel">📊 breakdown</div>
+    <div class="g3" style="margin-bottom:14px;">
+      <div class="card">
+        <div class="card-title">Why tickets were raised</div>
+        <div class="card-sub">ticket type distribution</div>
+        <ul class="blist">
+          ${(y.ticket_types||[]).map((t,i)=>{
+            const max=Math.max(...(y.ticket_types||[]).map(x=>x.count),1);
+            const cols=['#4f8ef7','#f7b84f','#3dd68c','#f75f5f','#a78bfa'];
+            return `<li class="brow"><span class="blbl">${t.name}</span><div class="btrack"><div class="bfill" style="width:${Math.round(t.count/max*100)}%;background:${cols[i%cols.length]};"></div></div><span class="bval">${t.count}</span></li>`;
+          }).join('')}
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Rating breakdown</div>
+        <div class="card-sub">from bad rating tickets</div>
+        ${[5,4,3,2,1].map(s=>{
+          const c=y.ratings?.[s]||0;
+          const max=Math.max(...[1,2,3,4,5].map(x=>y.ratings?.[x]||0),1);
+          const cols={5:'#3dd68c',4:'#7dd68c',3:'#f7b84f',2:'#f77d4f',1:'#f75f5f'};
+          return `<div class="srow"><span class="slbl2">${s}★</span><div class="strack"><div class="sfill" style="width:${Math.round(c/max*100)}%;background:${cols[s]};"></div></div><span class="snum">${c}</span></div>`;
+        }).join('')}
+        ${star1pct>50?`<div class="insight">⚠ ${star1pct}% of ratings were 1★</div>`:''}
+      </div>
+
+      <div class="card">
+        <div class="card-title">AI vs Human</div>
+        <div class="card-sub">resolution split today</div>
+        <div style="position:relative;width:100%;height:148px;"><canvas id="donutChart"></canvas></div>
+        <div style="display:flex;gap:14px;justify-content:center;margin-top:12px;">
+          <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;"><span style="width:10px;height:10px;border-radius:2px;background:#4f8ef7;display:inline-block;"></span>AI ${pctAI}%</span>
+          <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;"><span style="width:10px;height:10px;border-radius:2px;background:#3dd68c;display:inline-block;"></span>Human ${100-pctAI}%</span>
+        </div>
+      </div>
+    </div>
+
+    ${(y.bad_reason_categories||[]).length>0?`
+    <div class="slabel">😡 reasons for bad ratings</div>
+    <div class="g2" style="margin-bottom:14px;">
+      <div class="card">
+        <div class="card-title">Complaint categories</div>
+        <div class="card-sub">1★ & 2★ feedback · ${data.date}</div>
+        <ul class="blist">
+          ${(y.bad_reason_categories||[]).map((r,i)=>{
+            const max=Math.max(...(y.bad_reason_categories||[]).map(x=>x.count),1);
+            const cols=['#f75f5f','#f77d4f','#f7b84f','#a78bfa','#4f8ef7','#3dd68c','#78909c','#ef5350'];
+            return `<li class="brow"><span class="blbl">${r.name}</span><div class="btrack"><div class="bfill" style="width:${Math.round(r.count/max*100)}%;background:${cols[i%cols.length]};"></div></div><span class="bval">${r.count}</span></li>`;
+          }).join('')}
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">User feedback verbatim</div>
+        <div class="card-sub">exact words from complaints</div>
+        ${(y.user_quotes||[]).length>0
+          ?(y.user_quotes||[]).slice(0,5).map(q=>`<div class="qrow"><div class="qtext">${q.text}</div><div class="qmeta">${q.rating?q.rating+'★ · ':''}${q.sport||''}${q.location?' · '+q.location:''}</div></div>`).join('')
+          :'<div class="empty">No written feedback today</div>'}
+      </div>
+    </div>`:''}
+
+    ${(y.sports_breakdown||[]).length>0?`
+    <div class="slabel">🏅 bad ratings by sport</div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-title">Which sport generated the most complaints</div>
+      <div class="card-sub">bad rating tickets by equipment type · ${data.date}</div>
+      <div style="position:relative;width:100%;height:180px;"><canvas id="sportChart"></canvas></div>
+    </div>`:''}
+
+    <div class="slabel">📈 7-day trend</div>
+    <div class="card" style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div><div class="card-title">Tickets per day</div><div class="card-sub" style="margin-bottom:0;">7 days ending ${displayDate}</div></div>
+        <div style="display:flex;gap:12px;">
+          <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;"><span style="width:10px;height:10px;border-radius:2px;background:#4f8ef7;display:inline-block;"></span>AI</span>
+          <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;"><span style="width:10px;height:10px;border-radius:2px;background:#3dd68c;display:inline-block;"></span>Human</span>
+        </div>
+      </div>
+      <div style="position:relative;width:100%;height:200px;"><canvas id="trendChart"></canvas></div>
+    </div>
+
+    <div class="slabel">${open.length>0?'🔓 open tickets — action required':'✅ open tickets'}</div>
+    <div class="card">
+      ${open.length>0
+        ?open.map(t=>{
+          const pc=t.type==='non_return'?'t-amber':t.rating<=2?'t-red':'t-blue';
+          const pl=t.type==='non_return'?'non-return':t.rating?t.rating+'★':'open';
+          return `<div class="trow"><span class="tpill ${pc}">${pl}</span><div><div class="ttitle">${t.issue} — ${t.user}</div><div class="tmeta">${t.location}${t.time?' · '+t.time:''}</div>${t.url?`<a class="tlink" href="${t.url}" target="_blank">Open in Intercom →</a>`:''}</div></div>`;
+        }).join('')
+        :'<div class="empty">No open tickets right now 🎉</div>'}
+    </div>
+  `;
+
+  // Charts
+  charts.donut = new Chart(document.getElementById('donutChart'),{
+    type:'doughnut',
+    data:{labels:['AI','Human'],datasets:[{data:[y.ai_resolved||0,y.human_resolved||0],backgroundColor:['#4f8ef7','#3dd68c'],borderWidth:0,hoverOffset:4}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'70%',plugins:{legend:{display:false}}}
+  });
+
+  if((y.sports_breakdown||[]).length>0){
+    const cols=['#4f8ef7','#3dd68c','#f7b84f','#a78bfa','#f75f5f','#78909c'];
+    charts.sport = new Chart(document.getElementById('sportChart'),{
+      type:'bar',
+      data:{labels:y.sports_breakdown.map(s=>s.sport),datasets:[{data:y.sports_breakdown.map(s=>s.count),backgroundColor:y.sports_breakdown.map((_,i)=>cols[i%cols.length]),borderRadius:5}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.parsed.y} bad ratings`}}},
+        scales:{x:{grid:{display:false},ticks:{color:'#4a5680',font:{size:12}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#4a5680',font:{size:11}},beginAtZero:true}}}
+    });
+  }
+
+  if(trend.length>0){
+    charts.trend = new Chart(document.getElementById('trendChart'),{
+      type:'bar',
+      data:{labels:trend.map(d=>d.label||d.date),datasets:[
+        {label:'AI',data:trend.map(d=>d.ai||0),backgroundColor:'#4f8ef7',borderRadius:4,stack:'a'},
+        {label:'Human',data:trend.map(d=>d.human||0),backgroundColor:'#3dd68c',borderRadius:4,stack:'a'}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{mode:'index'}},
+        scales:{x:{stacked:true,grid:{display:false},ticks:{color:'#4a5680',font:{size:11},maxRotation:30}},
+                y:{stacked:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#4a5680',font:{size:11}},beginAtZero:true}}}
+    });
+  }
+}
+
+window.addEventListener('load', loadData);
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "playmade-dashboard",
+  "version": "1.0.0",
+  "description": "Playmade Intercom Support Dashboard",
+  "engines": {
+    "node": ">=18"
+  }
+}
