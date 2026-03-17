@@ -28,7 +28,12 @@ export default async function handler(req, res) {
           'Intercom-Version': '2.11'
         }
       });
-      if (!r.ok) throw new Error(`Intercom error ${r.status}: ${await r.text()}`);
+      if (!r.ok) {
+        const body = await r.text().catch(() => '');
+        if (r.status === 401) throw new Error('Intercom token is invalid or expired. Check INTERCOM_ACCESS_TOKEN in Vercel.');
+        if (r.status === 429) throw new Error('Intercom rate limit hit. Wait a moment and try again.');
+        throw new Error(`Intercom error ${r.status}: ${body.slice(0, 200)}`);
+      }
       return r.json();
     }
 
@@ -56,6 +61,20 @@ export default async function handler(req, res) {
       const ca = c.created_at || 0;
       return ca >= dayStart && ca <= dayEnd;
     });
+
+    // Handle no data — return valid empty structure instead of erroring
+    if (yesterdayConvos.length === 0 && (openData.conversations || []).length === 0) {
+      return res.status(200).json({
+        date,
+        yesterday: {
+          total: 0, ai_resolved: 0, human_resolved: 0, avg_close_min: 0,
+          ticket_types: [], ratings: { '1':0,'2':0,'3':0,'4':0,'5':0 },
+          bad_reason_categories: [], user_quotes: [], sports_breakdown: []
+        },
+        open_tickets: [],
+        trend_7days: []
+      });
+    }
 
     // ── 2. Build raw data summary for Claude to analyse ───────────────────
     const rawSummary = yesterdayConvos.map(c => {
@@ -153,10 +172,12 @@ Rules:
       })
     });
 
-    const claudeData = await claudeRes.json();
-    const claudeText = claudeData.content?.map(b => b.text || '').join('').trim().replace(/```json|```/g, '').trim();
     let analysis = { bad_reason_categories: [], user_quotes: [], sports_breakdown: [] };
-    try { analysis = JSON.parse(claudeText); } catch(e) {}
+    if (claudeRes.ok) {
+      const claudeData = await claudeRes.json();
+      const claudeText = claudeData.content?.map(b => b.text || '').join('').trim().replace(/```json|```/g, '').trim();
+      try { analysis = JSON.parse(claudeText); } catch(e) { /* Claude returned non-JSON, use empty defaults */ }
+    }
 
     // ── 4. Assemble final response ────────────────────────────────────────
     const ai_count = yesterdayConvos.filter(c => c.ai_agent_participated).length;
